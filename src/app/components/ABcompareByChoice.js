@@ -24,7 +24,7 @@ const calcAminusB = (bnBookData, okxBookData) => {
   const bAsk = parseFloat(okxBookData.bestAsk.price);
   if (aBid <= 0 || bAsk <= 0) return "N/A";
   const spread = ((aBid - bAsk) / (aBid + bAsk)) * 2 * 100;
-  return `${spread.toFixed(2)}%`;
+  return spread.toFixed(2);
 };
 
 const calcBminusA = (bnBookData, okxBookData) => {
@@ -34,7 +34,7 @@ const calcBminusA = (bnBookData, okxBookData) => {
   const aAsk = parseFloat(bnBookData.bestAsk.price);
   if (bBid <= 0 || aAsk <= 0) return "N/A";
   const spread = ((bBid - aAsk) / (bBid + aAsk)) * 2 * 100;
-  return `${spread.toFixed(2)}%`;
+  return spread.toFixed(2);
 };
 
 // Reusable display component for each exchange's order book data
@@ -89,7 +89,11 @@ function PairSubscription({ pair, now }) {
   const netBtoA = parseFloat(spreadBminusA) - feeAdjustment;
   const profitAtoBUSDT = (netAtoB / 100) * fakeBalance;
   const profitBtoAUSDT = (netBtoA / 100) * fakeBalance;
+  const [quantity, setQuantity] = useState(0);
+  const [executeRate, setExecuteRate] = useState(0);
+  const [listenForMatch, setListenForMatch] = useState(false);
 
+  
   //================== Binance WebSocket ==================
   const connectBinanceWs = useCallback(() => {
     const BINANCE_WS_URL = "wss://fstream.binance.com/ws";
@@ -200,6 +204,24 @@ function PairSubscription({ pair, now }) {
     };
   }, [connectBinanceWs, connectOkxWs]);
 
+  const placeOrder = (order) => {
+    console.log("Place order for pair:",  order);
+  }
+
+  useEffect(() => {
+    if (listenForMatch && Number(spreadAminusB) > Number(executeRate)) {
+      console.log("order placed");
+      console.log(pair,spreadAminusB);      
+
+      setListenForMatch(false); 
+    }
+  }, [spreadAminusB, executeRate, listenForMatch, pair]);
+
+  const handleTestButtonClick = () => {
+    setListenForMatch(true);
+    console.log("Started listening for spreadAminusB changes...");
+  };
+
   return (
     <div className="single box flex flex-row justify-between gap-1 w-full p-4 border border-dashed rounded-lg shadow-md my-4">
       <div className="flex flex-col justify-center items-center w-full max-w-[550px]">
@@ -221,20 +243,69 @@ function PairSubscription({ pair, now }) {
       <div className="w-full flex flex-col justify-center items-center gap-3">
         <div className="flex flex-row gap-5">
           <div>-A + B:</div>
-          <div>{spreadAminusB}</div>
-          <div>Profit: {netAtoB.toFixed(3)}%</div>
-          <div>Profit USDT: {profitAtoBUSDT.toFixed(3)}$</div>
-        </div>
+          <div>{spreadAminusB}%</div>
+          <label className="text-slate-600">{executeRate}%</label>
+          <input
+            className="w-20 text-slate-600"
+            type="number"
+            value={executeRate}
+            onChange={(e) => setExecuteRate(e.target.value)}
+          />
+          <button
+            onClick={handleTestButtonClick}
+            className="bg-green-500 text-white px-3 font-medium rounded"
+          >
+            test
+          </button>
+           </div>
+
         <div className="flex flex-row gap-5">
           <div>+A - B:</div>
-          <div>{spreadBminusA}</div>
-          <div>Profit: {netBtoA.toFixed(3)}%</div>
-          <div>Profit USDT: {profitBtoAUSDT.toFixed(3)}$</div>
+          <div>{spreadBminusA}%</div>
+        
         </div>
       </div>
+
     </div>
   );
 }
+{/* <div className="flex flex-col ">
+<input 
+  type="number" 
+  className="w-20 text-slate-600" 
+  value={quantity} onChange={(e) =>  setQuantity(e.target.value)} />
+  {quantity}%
+  <button
+    onClick={() => {
+      let orderBinance = {
+        symbol: pair.binance,
+        side: 'LONG',// SHORT or BOTH
+        type : 'MARKET', // MARKET
+        timeInForce: 'GTC',
+        quantity: '',
+        // price: bnBookData?.bestBid?.price,
+        reduceOnly: false,
+      }
+
+      placeOrder(orderBinance)
+    }}
+    className=" bg-green-500 text-white px-3 font-medium rounded"
+  >
+   確認
+  </button>
+</div>
+*/}
+
+
+  //         symbol: 'BTCUSDT',
+  //         side: 'BUY',
+  //         strategyType: 'TAKE_PROFIT',
+  //         timeInForce: 'GTC',
+  //         quantity: '0.002',
+  //         price: '10000',
+  //         stopPrice: '14000',
+  //         triggerPrice: '10000',
+  //         reduceOnly: true,
 
 // Main component
 export default function ABcompareByChoice() {
@@ -266,7 +337,7 @@ export default function ABcompareByChoice() {
       const result = await response.json();
       const binanceFutures = result
         .map((item) => item.symbol)
-        .filter((symbol) => !symbol.includes("USDC"));
+        // .filter((symbol) => !symbol.includes("USDC"));
       setBnSymbols(binanceFutures);
     } catch (error) {
       console.error("Error fetching Binance data:", error);
@@ -282,7 +353,7 @@ export default function ABcompareByChoice() {
       if (!result.data) throw new Error("Failed to fetch OKX instruments");
       const swapContracts = result.data
         .map((item) => item.instId)
-        .filter((instId) => !instId.includes("USDC"));
+        // .filter((instId) => !instId.includes("USDC"));
       setOkxSymbols(swapContracts);
     } catch (error) {
       console.error("Error fetching OKX data:", error);
@@ -300,7 +371,7 @@ export default function ABcompareByChoice() {
     if (!bnSymbols.length || !okxSymbols.length) return [];
     const matches = [];
     bnSymbols.forEach((bnSymbol) => {
-      if (bnSymbol.includes("_") || bnSymbol.includes("USDC")) return;
+      // if (bnSymbol.includes("_") || bnSymbol.includes("USDC")) return;
       const okxSymbol = mapBinanceToOkx(bnSymbol);
       if (okxSymbols.includes(okxSymbol)) {
         matches.push({
@@ -319,7 +390,7 @@ export default function ABcompareByChoice() {
     const coin = coinInput.trim().toUpperCase();
     const quote = quoteInput.trim().toUpperCase();
     if (!coin || !quote) {
-      setErrorMessage("Both coin and quote are required.");
+      setErrorMessage("請輸入幣種和幣種");
       return;
     }
     const bnPair = `${coin}${quote}`;
@@ -337,11 +408,11 @@ export default function ABcompareByChoice() {
         setCoinInput("");
         setQuoteInput("");
       } else {
-        setErrorMessage("Already subscribed to this pair.");
+        setErrorMessage("此交易對已訂閱");
       }
     } else {
       setErrorMessage(
-        `The trading pair ${coin}-${quote} is not available on both exchanges.`
+        `此交易對${coin}-${quote}在兩個交易所都不可用`
       );
     }
   };
@@ -384,7 +455,7 @@ export default function ABcompareByChoice() {
           <PairSubscription key={pair.binance} pair={pair} now={now} />
         ))
       ) : (
-        <div>Please subscribe to a trading pair.</div>
+        <div>請訂閱交易對</div>
       )}
     </div>
   );

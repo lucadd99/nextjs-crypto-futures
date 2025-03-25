@@ -3,8 +3,8 @@
 // import BnMultiFutures from "./components/BnMultiFututres";
 // import OkxMultiFutures from "./components/OkxMultiFutures";
 // import ABcompare from "./components/ABcompare";
-import BnFuturesBalanceWS from "./components/binanceAccount/BnFuturesBalanceWS";
 import ABcompareByChoice from "./components/ABcompareByChoice";
+import AccountInfo from "./components/binanceAccount/AccountInfo";
 export default function Home() {
   return (
     <div className="w-full flex items-start min-h-screen p-8 pb-20 gap-16 font-[family-name:var(--font-geist-sans)]">
@@ -16,8 +16,11 @@ export default function Home() {
           {/* <BnMultiFutures /> */}
           {/* <OkxMultiFutures /> */}
           {/* <ABcompare /> */}
-          <BnFuturesBalanceWS />
-          {/* <ABcompareByChoice /> */}
+          <div className="mb-10">
+
+          <AccountInfo />
+          </div>
+          <ABcompareByChoice />
         </div>
       </div>
     </div>

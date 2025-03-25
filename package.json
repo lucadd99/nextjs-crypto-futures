@@ -15,9 +15,12 @@
   "dependencies": {
     "@noble/curves": "^1.8.1",
     "@noble/ed25519": "^2.2.3",
-    "axios": "^1.8.1",
+    "axios": "^1.8.4",
+    "binance": "^2.15.14",
     "binance-api-node": "^0.12.9",
     "ccxt": "^4.4.62",
+    "crypto": "^1.0.1",
+    "crypto-js": "^4.2.0",
     "dotenv": "^16.4.7",
     "next": "15.1.7",
     "react": "^19.0.0",
