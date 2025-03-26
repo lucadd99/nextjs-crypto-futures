@@ -1,8 +1,7 @@
-// /app/api/binance/route.js
 import { PortfolioClient } from "binance";
 import axios from "axios";
 // 統一帳戶使用 PortfolioClient
-export async function GET(request) {
+export async function POST(request) {
   // Check if the environment variables are set
   if (!process.env.BINANCE_API_KEY || !process.env.BINANCE_API_SECRET) {
     return new Response(
@@ -18,16 +17,7 @@ export async function GET(request) {
 
   try {
    
-
-    const accountInfo = await client.getAccountInfo({
-      //帳戶資訊
-
-    });
-    const accountBalance = await client.getBalance({
-      //所有資產
-    
-    });
-
+    const order = await request.json();
     // const result = await client.getAllCMOpenOrders(); //所有CM艙單
     // const result = await client.getAllMarginOCO(); //所有OCO
     // const result = await client.getAllUMOrders(); //所有艙單
@@ -35,16 +25,8 @@ export async function GET(request) {
     // const result = await client.closePMUserDataListenKey(); //close listenKey for WebSocket
 
     // ------------下訂單----------------
-    //const result = await client.submitNewUMOrder( {
-    //         symbol: 'BTCUSDT',
-    //         side: 'LONG',
-    //         type : 'LIMIT',
-    //         timeInForce: 'GTC',
-    //         quantity: '0.002',
-    //         price: '10000',
-    //         reduceOnly: false,
-    //     }
-    //  );
+     const placeUMOrder = await client.submitNewUMOrder(order);
+     console.log(placeUMOrder);
 
     // ------------下條件訂單----------------
     // const result = await client.submitNewUMConditionalOrder(
@@ -65,7 +47,7 @@ export async function GET(request) {
     // const result = await client.getUMCommissionRate(); //獲取UM帳戶佣金率
     //   const umAccountInfo  = await client.getUMAccount(); //獲取UM帳戶資訊
     //   console.log('accountBalance:', accountBalance     );
-    return new Response(JSON.stringify({ accountInfo, accountBalance }), {
+    return new Response(JSON.stringify({ placeUMOrder }), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });

@@ -89,10 +89,12 @@ function PairSubscription({ pair, now }) {
   const netBtoA = parseFloat(spreadBminusA) - feeAdjustment;
   const profitAtoBUSDT = (netAtoB / 100) * fakeBalance;
   const profitBtoAUSDT = (netBtoA / 100) * fakeBalance;
-  const [quantity, setQuantity] = useState(0);
-  const [executeRate, setExecuteRate] = useState(0);
-  const [listenForMatch, setListenForMatch] = useState(false);
 
+  // 使用者輸入
+  const [listenForMatch, setListenForMatch] = useState(false);
+  const [executeRateAminusB, setExecuteRateAminusB] = useState(0);
+  const [executeRateBminusA, setExecuteRateBminusA] = useState(0);
+  const [size, setSize] =useState(0)
   
   //================== Binance WebSocket ==================
   const connectBinanceWs = useCallback(() => {
@@ -204,22 +206,79 @@ function PairSubscription({ pair, now }) {
     };
   }, [connectBinanceWs, connectOkxWs]);
 
-  const placeOrder = (order) => {
-    console.log("Place order for pair:",  order);
+  // 下單
+  const placeOrder = async (order) => {
+    // should be divided in 2 , for binance and okx
+    try {
+      const response = await fetch('/api/binance/order', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(order),
+      });    
+      
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
+      }
+      const data = await response.json();
+      console.log('from order API:', data);
+    } catch (err) {
+      console.error('Order API error:', err);
+    }
   }
 
+
+    // 空A多B
   useEffect(() => {
-    if (listenForMatch && Number(spreadAminusB) > Number(executeRate)) {
-      console.log("order placed");
-      console.log(pair,spreadAminusB);      
+    if (listenForMatch && Number(spreadAminusB) > Number(executeRateAminusB)) {
+      let orderBinance = {
+        symbol: pair.binance,
+        side: 'BUY',// SHORT or BOTH
+        type : 'MARKET', // MARKET
+        // timeInForce: 'GTC',
+        quantity: size,
+        reduceOnly: true,
+      }
+      console.log("-A + B 訂單成立");
+      console.log(pair,spreadAminusB); 
+      console.log("訂單 -A + B:",orderBinance); 
 
       setListenForMatch(false); 
     }
-  }, [spreadAminusB, executeRate, listenForMatch, pair]);
 
-  const handleTestButtonClick = () => {
+  }, [spreadAminusB, executeRateAminusB, listenForMatch, pair]);
+
+  // 空B多A
+  useEffect(() => {
+    if (listenForMatch && Number(spreadBminusA) > Number(executeRateBminusA)) {
+      let orderBinance = {
+        symbol: pair.binance,
+        side: 'BUY',// SHORT or BOTH
+        type : 'MARKET', // MARKET
+        // timeInForce: 'GTC',
+        quantity: size,
+        reduceOnly: false,
+      }
+      console.log(" +A - B 訂單成立");
+      console.log(pair,spreadBminusA); 
+      console.log("訂單 +A - B:",orderBinance); 
+      placeOrder(orderBinance);
+      setListenForMatch(false); 
+    }
+
+  }, [spreadBminusA, executeRateBminusA, listenForMatch, pair]);
+
+
+
+  const handleTestButtonClick = (v) => {
     setListenForMatch(true);
-    console.log("Started listening for spreadAminusB changes...");
+    if (v ===1) {
+      console.log(`開始監聽 -A + B ------- ${executeRateAminusB}%`);
+      
+    }else{
+      console.log(`開始監聽 +A - B ------- ${executeRateBminusA}%`);
+    }
   };
 
   return (
@@ -241,28 +300,54 @@ function PairSubscription({ pair, now }) {
         />
       </div>
       <div className="w-full flex flex-col justify-center items-center gap-3">
+        <div className="flex flex-row gap-3">
+
+         <span className="text-slate-600">數量:</span>
+         <input
+            className="w-20 text-slate-600"
+            type="number"
+            value={size}
+            onChange={(e) => setSize(e.target.value)}
+          />
+        </div>
         <div className="flex flex-row gap-5">
           <div>-A + B:</div>
           <div>{spreadAminusB}%</div>
-          <label className="text-slate-600">{executeRate}%</label>
-          <input
-            className="w-20 text-slate-600"
-            type="number"
-            value={executeRate}
-            onChange={(e) => setExecuteRate(e.target.value)}
-          />
-          <button
-            onClick={handleTestButtonClick}
-            className="bg-green-500 text-white px-3 font-medium rounded"
-          >
-            test
-          </button>
+          <div className="flex flex-row gap-3">
+            <label className="text-slate-600">{executeRateAminusB}%</label>
+            <input
+              className="w-20 text-slate-600"
+              type="number"
+              value={executeRateAminusB}
+              onChange={(e) => setExecuteRateAminusB(e.target.value)}
+            />
+            <button
+              onClick={() => handleTestButtonClick(1)}
+              className="bg-green-500 text-white px-3 font-medium rounded"
+            >
+              test
+            </button>
+          </div>
            </div>
 
         <div className="flex flex-row gap-5">
           <div>+A - B:</div>
           <div>{spreadBminusA}%</div>
-        
+          <div className="flex flex-row gap-3">
+            <label className="text-slate-600">{executeRateBminusA}%</label>
+            <input
+              className="w-20 text-slate-600"
+              type="number"
+              value={executeRateBminusA}
+              onChange={(e) => setExecuteRateBminusA(e.target.value)}
+            />
+            <button
+              onClick={() => handleTestButtonClick(2)}
+              className="bg-green-500 text-white px-3 font-medium rounded"
+            >
+              test
+            </button>
+          </div>
         </div>
       </div>
 
@@ -296,16 +381,6 @@ function PairSubscription({ pair, now }) {
 </div>
 */}
 
-
-  //         symbol: 'BTCUSDT',
-  //         side: 'BUY',
-  //         strategyType: 'TAKE_PROFIT',
-  //         timeInForce: 'GTC',
-  //         quantity: '0.002',
-  //         price: '10000',
-  //         stopPrice: '14000',
-  //         triggerPrice: '10000',
-  //         reduceOnly: true,
 
 // Main component
 export default function ABcompareByChoice() {
