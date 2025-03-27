@@ -284,10 +284,10 @@ function PairSubscription({ pair, now }) {
         clOrdId: "lucaTestOrder",
         side: "buy",
         ordType: "market",
-        sz: 5, //This is weird!!!!
+        sz: size,
         //posSide:"long",
       };
-
+0.8162
       console.log("-A + B 訂單成立");
       console.log(pair, spreadAminusB);
       console.log("訂單 -A:", orderBinance);
