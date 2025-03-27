@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-export default function AccountInfo() {
+export default function BinanceAccountInfo() {
   const [accountInfo, setAccountInfo] = useState(null);
   const [accountBalance, setAccountBalance] = useState(null);
   const [error, setError] = useState(null);
@@ -24,11 +24,10 @@ export default function AccountInfo() {
   }, []);
 
   return (
-    <div className='flex flex-col gap-4 border border-gray-400 p-4 rounded-lg'>
+    <div className='flex flex-col gap-4 border-2 border-gray-400 p-3 rounded-lg'>
       {error && <p>Error: {error}</p>}
-      <h2 className='text-lg font-bold text-yellow-400'>BINANCE</h2>
+      <h2 className='text-lg font-bold text-yellow-400 text-center'>BINANCE</h2>
       <div className='flex flex-row gap-10'>
-      {/* Regular Account Info */}
       {accountInfo ? (
         <div className='flex flex-col gap-2'>
           <h2 className='text-lg font-bold'>帳戶資訊 Account Information </h2>

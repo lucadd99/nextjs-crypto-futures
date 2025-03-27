@@ -16,7 +16,6 @@ export async function POST(request) {
   });
 
   try {
-   
     const order = await request.json();
     // const result = await client.getAllCMOpenOrders(); //所有CM艙單
     // const result = await client.getAllMarginOCO(); //所有OCO
@@ -40,6 +39,8 @@ export async function POST(request) {
     //         stopPrice: '14000',
     //         triggerPrice: '10000',
     //         reduceOnly: true,
+
+
     //     }
     //  );
 

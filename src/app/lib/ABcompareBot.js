@@ -107,12 +107,12 @@ const fakeBalance = 1000; // USDT-
           ((okxBid - binanceAsk) / (okxBid + binanceAsk)) * 2 * 100;
 
         // Trading fees and net profit calculation
-        const tradingFees = 0.02 / 100; // 0.02% per trade
+        const tradingFees = 0.2 / 100; // 0.02% per trade
         const feeAdjustment = 2 * tradingFees * 100; // equals 0.04%
         const netAtoB = spreadAtoB - feeAdjustment; //  OKX 做多, Binance 做空
         const netBtoA = spreadBtoA - feeAdjustment; //  Binance 做多, OKX 做空
 
-        const minProfitThreshold = 0.3;
+        const minProfitThreshold = 0.01;
         const profitAtoBUSDT = (netAtoB / 100) * fakeBalance;
         const profitBtoAUSDT = (netBtoA / 100) * fakeBalance;
 

@@ -51,7 +51,9 @@ const ExchangeOrderBook = React.memo(function ExchangeOrderBook({
       <div className="font-bold">
         {exchangeName}: {pair}
       </div>
-      <div className={`${exchangeName} pl-32 flex flex-row gap-10 text-slate-500`}>
+      <div
+        className={`${exchangeName} pl-32 flex flex-row gap-10 text-slate-500`}
+      >
         <span className="flex gap-2">
           <span>
             {funding.fundingRate !== undefined
@@ -91,11 +93,13 @@ function PairSubscription({ pair, now }) {
   const profitBtoAUSDT = (netBtoA / 100) * fakeBalance;
 
   // 使用者輸入
-  const [listenForMatch, setListenForMatch] = useState(false);
+  const [listenForMatchAminusB, setListenForMatchAminusB] = useState(false);
+  const [listenForMatchBminusA, setListenForMatchBminusA] = useState(false);
+
   const [executeRateAminusB, setExecuteRateAminusB] = useState(0);
   const [executeRateBminusA, setExecuteRateBminusA] = useState(0);
-  const [size, setSize] =useState(0)
-  
+  const [size, setSize] = useState(0);
+
   //================== Binance WebSocket ==================
   const connectBinanceWs = useCallback(() => {
     const BINANCE_WS_URL = "wss://fstream.binance.com/ws";
@@ -127,7 +131,11 @@ function PairSubscription({ pair, now }) {
       }
     };
     ws.onclose = () => {
-      console.log("Binance WebSocket disconnected for", pair.binance, ". Reconnecting...");
+      console.log(
+        "Binance WebSocket disconnected for",
+        pair.binance,
+        ". Reconnecting..."
+      );
       setTimeout(connectBinanceWs, 2000);
     };
     ws.onerror = (err) => {
@@ -179,14 +187,21 @@ function PairSubscription({ pair, now }) {
           const fundingData = data.data[0];
           const expiryTime = Number(fundingData.fundingTime);
           setOkxFunding({
-            fundingRate: fundingData.fundingRate !== undefined ? fundingData.fundingRate : "N/A",
+            fundingRate:
+              fundingData.fundingRate !== undefined
+                ? fundingData.fundingRate
+                : "N/A",
             fundingExpiry: expiryTime,
           });
         }
       }
     };
     ws.onclose = () => {
-      console.log("OKX WebSocket disconnected for", pair.okx, ". Reconnecting...");
+      console.log(
+        "OKX WebSocket disconnected for",
+        pair.okx,
+        ". Reconnecting..."
+      );
       setTimeout(connectOkxWs, 2000);
     };
     ws.onerror = (err) => {
@@ -207,76 +222,120 @@ function PairSubscription({ pair, now }) {
   }, [connectBinanceWs, connectOkxWs]);
 
   // 下單
-  const placeOrder = async (order) => {
+  const placeOrder = async ({ orderBinance, orderOkx }) => {
     // should be divided in 2 , for binance and okx
+    console.log("====================================");
+    console.log("from placeorder:", orderBinance, orderOkx);
+    console.log("====================================");
     try {
-      const response = await fetch('/api/binance/order', {
-        method: 'POST',
+      const response = await fetch("/api/binance/order", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
-        body: JSON.stringify(order),
-      });    
-      
+        body: JSON.stringify(orderBinance),
+      });
+
       if (!response.ok) {
-        throw new Error('Network response was not ok');
+        throw new Error("Network response was not ok");
       }
       const data = await response.json();
-      console.log('from order API:', data);
+      console.log("from order bInance API:", data);
     } catch (err) {
-      console.error('Order API error:', err);
+      console.error("Order Binance API error:", err);
     }
-  }
+    try {
+      const response = await fetch("/api/okx/trade", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(orderOkx),
+      });
 
-
-    // 空A多B
-  useEffect(() => {
-    if (listenForMatch && Number(spreadAminusB) > Number(executeRateAminusB)) {
-      let orderBinance = {
-        symbol: pair.binance,
-        side: 'BUY',// SHORT or BOTH
-        type : 'MARKET', // MARKET
-        // timeInForce: 'GTC',
-        quantity: size,
-        reduceOnly: true,
+      if (!response.ok) {
+        throw new Error("Network response was not ok");
       }
-      console.log("-A + B 訂單成立");
-      console.log(pair,spreadAminusB); 
-      console.log("訂單 -A + B:",orderBinance); 
-
-      setListenForMatch(false); 
+      const data = await response.json();
+      console.log("from order OKX API:", data);
+    } catch (err) {
+      console.error("Order OKX API error:", err);
     }
 
-  }, [spreadAminusB, executeRateAminusB, listenForMatch, pair]);
+  };
 
-  // 空B多A
+  // 空A多B
   useEffect(() => {
-    if (listenForMatch && Number(spreadBminusA) > Number(executeRateBminusA)) {
-      let orderBinance = {
+    if (
+      listenForMatchAminusB &&
+      Number(spreadAminusB) > Number(executeRateAminusB)
+    ) {
+      const orderBinance = {
         symbol: pair.binance,
-        side: 'BUY',// SHORT or BOTH
-        type : 'MARKET', // MARKET
+        side: "SELL", // SHORT or BOTH
+        type: "MARKET", // MARKET
         // timeInForce: 'GTC',
         quantity: size,
         reduceOnly: false,
-      }
-      console.log(" +A - B 訂單成立");
-      console.log(pair,spreadBminusA); 
-      console.log("訂單 +A - B:",orderBinance); 
-      placeOrder(orderBinance);
-      setListenForMatch(false); 
+      };
+      const orderOkx = {
+        instId: pair.okx,
+        tdMode: "cross",
+        clOrdId: "lucaTestOrder",
+        side: "buy",
+        ordType: "market",
+        sz: 5, //This is weird!!!!
+        //posSide:"long",
+      };
+
+      console.log("-A + B 訂單成立");
+      console.log(pair, spreadAminusB);
+      console.log("訂單 -A:", orderBinance);
+      console.log("訂單 +B:", orderOkx);
+      placeOrder({ orderBinance: orderBinance, orderOkx: orderOkx });
+      setListenForMatchAminusB(false);
     }
+  }, [spreadAminusB, executeRateAminusB, listenForMatchAminusB]);
 
-  }, [spreadBminusA, executeRateBminusA, listenForMatch, pair]);
+  // 多A空B
+  useEffect(() => {
+    if (
+      listenForMatchBminusA &&
+      Number(spreadBminusA) > Number(executeRateBminusA)
+    ) {
+      const orderBinance = {
+        symbol: pair.binance,
+        side: "BUY", // SHORT or BOTH
+        type: "MARKET", // MARKET
+        // timeInForce: 'GTC',
+        quantity: size,
+        reduceOnly: false,
+      };
+      const orderOkx = {
+        instId: pair.okx,
+        tdMode: "cross",
+        clOrdId: "lucaTestOrder",
+        side: "sell",
+        ordType: "market",
+        sz: size,
+        //posSide:"long",
+      };
+      console.log(" +A - B 訂單成立");
+      console.log(pair, spreadBminusA);
+      console.log("訂單 +A:", orderBinance);
+      console.log("訂單 -B:", orderOkx);
 
-
+      placeOrder({ orderBinance: orderBinance, orderOkx: orderOkx });
+      setListenForMatchBminusA(false);
+    }
+  }, [spreadBminusA, executeRateBminusA, listenForMatchBminusA]);
 
   const handleTestButtonClick = (v) => {
-    setListenForMatch(true);
-    if (v ===1) {
+    if (v === 1) {
+      setListenForMatchAminusB(true);
       console.log(`開始監聽 -A + B ------- ${executeRateAminusB}%`);
-      
-    }else{
+    } else {
+      setListenForMatchBminusA(true);
       console.log(`開始監聽 +A - B ------- ${executeRateBminusA}%`);
     }
   };
@@ -301,9 +360,8 @@ function PairSubscription({ pair, now }) {
       </div>
       <div className="w-full flex flex-col justify-center items-center gap-3">
         <div className="flex flex-row gap-3">
-
-         <span className="text-slate-600">數量:</span>
-         <input
+          <span className="text-slate-600">數量:</span>
+          <input
             className="w-20 text-slate-600"
             type="number"
             value={size}
@@ -328,7 +386,7 @@ function PairSubscription({ pair, now }) {
               test
             </button>
           </div>
-           </div>
+        </div>
 
         <div className="flex flex-row gap-5">
           <div>+A - B:</div>
@@ -350,11 +408,11 @@ function PairSubscription({ pair, now }) {
           </div>
         </div>
       </div>
-
     </div>
   );
 }
-{/* <div className="flex flex-col ">
+{
+  /* <div className="flex flex-col ">
 <input 
   type="number" 
   className="w-20 text-slate-600" 
@@ -379,8 +437,8 @@ function PairSubscription({ pair, now }) {
    確認
   </button>
 </div>
-*/}
-
+*/
+}
 
 // Main component
 export default function ABcompareByChoice() {
@@ -403,16 +461,16 @@ export default function ABcompareByChoice() {
   }, []);
 
   const BINANCE_REST_URL = "https://fapi.binance.com/fapi/v1/ticker/bookTicker";
-  const OKX_REST_URL = "https://www.okx.com/api/v5/public/instruments?instType=SWAP";
+  const OKX_REST_URL =
+    "https://www.okx.com/api/v5/public/instruments?instType=SWAP";
 
   // Fetch Binance symbols
   const fetchBinance = useCallback(async () => {
     try {
       const response = await fetch(BINANCE_REST_URL);
       const result = await response.json();
-      const binanceFutures = result
-        .map((item) => item.symbol)
-        // .filter((symbol) => !symbol.includes("USDC"));
+      const binanceFutures = result.map((item) => item.symbol);
+      // .filter((symbol) => !symbol.includes("USDC"));
       setBnSymbols(binanceFutures);
     } catch (error) {
       console.error("Error fetching Binance data:", error);
@@ -426,9 +484,8 @@ export default function ABcompareByChoice() {
       const response = await fetch(OKX_REST_URL);
       const result = await response.json();
       if (!result.data) throw new Error("Failed to fetch OKX instruments");
-      const swapContracts = result.data
-        .map((item) => item.instId)
-        // .filter((instId) => !instId.includes("USDC"));
+      const swapContracts = result.data.map((item) => item.instId);
+      // .filter((instId) => !instId.includes("USDC"));
       setOkxSymbols(swapContracts);
     } catch (error) {
       console.error("Error fetching OKX data:", error);
@@ -486,9 +543,7 @@ export default function ABcompareByChoice() {
         setErrorMessage("此交易對已訂閱");
       }
     } else {
-      setErrorMessage(
-        `此交易對${coin}-${quote}在兩個交易所都不可用`
-      );
+      setErrorMessage(`此交易對${coin}-${quote}在兩個交易所都不可用`);
     }
   };
 
@@ -519,7 +574,10 @@ export default function ABcompareByChoice() {
             />
           </label>
         </div>
-        <button type="submit" className="bg-blue-500 text-white rounded px-3 py-1">
+        <button
+          type="submit"
+          className="bg-blue-500 text-white rounded px-3 py-1"
+        >
           訂閱
         </button>
       </form>

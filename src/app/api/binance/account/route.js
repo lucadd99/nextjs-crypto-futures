@@ -17,8 +17,6 @@ export async function GET(request) {
   });
 
   try {
-   
-
     const accountInfo = await client.getAccountInfo({
       //帳戶資訊
 
