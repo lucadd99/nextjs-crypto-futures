@@ -99,7 +99,10 @@ function PairSubscription({ pair, now }) {
   const [executeRateAminusB, setExecuteRateAminusB] = useState(0);
   const [executeRateBminusA, setExecuteRateBminusA] = useState(0);
   const [size, setSize] = useState(0);
-
+  const [minSizeBinance, setMinSizeBinance] = useState(null);
+  const [minSizeOkx, setMinSizeOkx] = useState(null);
+  const [ctValOkx, setCtValOkx] = useState(0);
+  const [sizeError, setSizeError] = useState("");
   //================== Binance WebSocket ==================
   const connectBinanceWs = useCallback(() => {
     const BINANCE_WS_URL = "wss://fstream.binance.com/ws";
@@ -261,8 +264,8 @@ function PairSubscription({ pair, now }) {
     } catch (err) {
       console.error("Order OKX API error:", err);
     }
-
   };
+
 
   // 空A多B
   useEffect(() => {
@@ -284,10 +287,9 @@ function PairSubscription({ pair, now }) {
         clOrdId: "lucaTestOrder",
         side: "buy",
         ordType: "market",
-        sz: size,
+        sz: size / ctValOkx, // 需為10的整數倍
         //posSide:"long",
       };
-0.8162
       console.log("-A + B 訂單成立");
       console.log(pair, spreadAminusB);
       console.log("訂單 -A:", orderBinance);
@@ -317,7 +319,7 @@ function PairSubscription({ pair, now }) {
         clOrdId: "lucaTestOrder",
         side: "sell",
         ordType: "market",
-        sz: size,
+        sz: size /ctValOkx,
         //posSide:"long",
       };
       console.log(" +A - B 訂單成立");
@@ -339,6 +341,151 @@ function PairSubscription({ pair, now }) {
       console.log(`開始監聽 +A - B ------- ${executeRateBminusA}%`);
     }
   };
+
+  // Fetch minSize when component mounts or when `pair.binance` changes
+  useEffect(() => {
+    let isMounted = true;
+    const fetchMinSize = async () => {
+      try {
+        const fetchedMinSizeBinance = await getFuturesMinOrderBinance(pair.binance);
+        if (isMounted) {
+          setMinSizeBinance(fetchedMinSizeBinance);
+        }
+        const OKXminSize = await getFuturesMinOrderOkx(pair.okx);
+         if (isMounted) {
+          setMinSizeOkx(OKXminSize);
+        }
+        // console.log("OKX", OKXminSize);
+      } catch (error) {
+        console.error("Error fetching minSize:", error);
+      }
+    };
+    fetchMinSize();
+    return () => {
+      isMounted = false;
+    };
+  }, [pair.binance]);
+
+  // 最小下單數量 Binance
+  const getFuturesMinOrderBinance = async (symbol) => {
+    // ------ONLY FOR BINANCE-----
+    const response = await fetch(
+      "https://fapi.binance.com/fapi/v1/exchangeInfo"
+    );
+    const data = await response.json();
+    // Find the symbol object
+    const targetSymbol = data.symbols.find((s) => s.symbol === symbol);
+    if (!targetSymbol) {
+      throw new Error(`Symbol ${symbol} not found on Binance Futures.`);
+    }
+    let minQty = null;
+    let stepSize = null;
+    let minNotional = null;
+    // Parse filters
+    for (const filter of targetSymbol.filters) {
+      if (filter.filterType === "LOT_SIZE") {
+        minQty = parseFloat(filter.minQty);
+        stepSize = parseFloat(filter.stepSize);
+      }
+      if (filter.filterType === "MIN_NOTIONAL") {
+        minNotional = parseFloat(filter.notional);
+      }
+    }
+    const tickerResponse = await fetch(
+      `https://fapi.binance.com/fapi/v1/ticker/price?symbol=${symbol}`
+    );
+    const tickerData = await tickerResponse.json();
+    const currentPrice = parseFloat(tickerData.price);
+    // Calculate the quantity needed to meet minNotional
+    // quantity * currentPrice >= minNotional
+    const qtyForMinNotional = minNotional / currentPrice;
+    // The actual minimum quantity is the max of (minQty, qtyForMinNotional),
+    // but also must align with stepSize increments if you place an order.
+    let requiredQty = Math.max(minQty, qtyForMinNotional);
+
+    // Round to the nearest stepSize multiple if needed
+    // e.g. if stepSize = 0.001, ensure requiredQty is a multiple of 0.001
+    requiredQty = Math.ceil(requiredQty / stepSize) * stepSize;
+
+    return requiredQty;
+  };
+   // 最小下單數量 OKX
+  const getFuturesMinOrderOkx = async (instId) => {
+    // Fetch instrument info from OKX
+    const url = `https://www.okx.com/api/v5/public/instruments?instType=SWAP&instId=${instId}`;
+    const response = await fetch(url);
+    const data = await response.json();
+    if (data.code !== "0" || !data.data || data.data.length === 0) {
+      throw new Error(`Instrument ${instId} not found on OKX.`);
+    }
+    const instrument = data.data[0];
+    // console.log(instrument);
+    // Parse the values from the instrument info.
+    // minSz and lotSz are in contract units,
+    // ctVal is the underlying amount per contract.
+    const minSz = parseFloat(instrument.minSz);   // e.g. 0.01 contracts
+    const lotSz = parseFloat(instrument.lotSz);     // e.g. 0.01 contracts
+    const ctVal = parseFloat(instrument.ctVal);     // e.g. 0.1 ETH per contract
+    setCtValOkx(ctVal)
+    // Round the minimum contract size up to a multiple of lotSz.
+    const requiredContractSize = Math.ceil(minSz / lotSz) * lotSz;
+    // Then, calculate the corresponding underlying amount.
+    const requiredUnderlying = requiredContractSize * ctVal; 
+    return requiredUnderlying;
+  };
+
+  const handleSizeChange = (e) => {
+    const value = Number(e.target.value);
+    setSize(value);
+    if (value % ctValOkx  !== 0) {
+      setSizeError(`請輸入${ctValOkx}的整數倍`);
+      return;
+    }
+    // If minSize is not yet loaded, skip further validation
+    if (minSizeBinance === null) {
+      setSizeError("正在載入最小下單數量…");
+      return;
+    }
+    // Now check if the value meets the minimum order size requirement
+    if (value < minSizeBinance) {
+      setSizeError(`此交易對Binance的最小下單數量為: ${minSizeBinance}`);
+      return;
+    }else if(value < minSizeOkx) {
+      setSizeError(`此交易對OKX的最小下單數量為: ${minSizeOkx}`);
+      return;
+    }
+   
+    setSizeError("");
+  };
+
+  // const TestOrder = async () => {
+  //   let testOrder = {
+  //     instId: "PIPPIN-USDT-SWAP",
+  //     tdMode: "cross", //保證金模式：isolated：逐倉；cross：全倉非保證金模式：cash
+  //     clOrdId: "lucaTestOrder01", //客戶自訂訂單ID
+  //     side: "buy",
+  //     ordType: "market", //訂單類型
+  //     sz: size / ctValOkx, //委託數量
+  //     //posSide:"long", //持倉方向在開平倉模式下必填，且僅可選擇long或short
+  //     //px: "2.15", //委託價格，僅適用於limit、post_only、fok、ioc、mmp、mmp_and_post_only
+  //   };
+  //   try {
+  //     const response = await fetch("/api/okx/trade", {
+  //       method: "POST",
+  //       headers: {
+  //         "Content-Type": "application/json",
+  //       },
+  //       body: JSON.stringify(testOrder),
+  //     });
+  //     if (!response.ok) {
+  //       throw new Error("Network response was not ok");
+  //     }
+  //     const data = await response.json();
+  //     console.log("from order OKX API:", data);
+  //   } catch (err) {
+  //     console.error("Order OKX API error:", err);
+  //   }
+  // };
 
   return (
     <div className="single box flex flex-row justify-between gap-1 w-full p-4 border border-dashed rounded-lg shadow-md my-4">
@@ -365,8 +512,9 @@ function PairSubscription({ pair, now }) {
             className="w-20 text-slate-600"
             type="number"
             value={size}
-            onChange={(e) => setSize(e.target.value)}
+            onChange={handleSizeChange}
           />
+          {sizeError && <span className="text-red-500">{sizeError}</span>}
         </div>
         <div className="flex flex-row gap-5">
           <div>-A + B:</div>
@@ -385,6 +533,13 @@ function PairSubscription({ pair, now }) {
             >
               test
             </button>
+
+            {/* <button
+              onClick={() => TestOrder()}
+              className="bg-green-500 text-white px-3 font-medium rounded"
+            >
+              TEST
+            </button> */}
           </div>
         </div>
 

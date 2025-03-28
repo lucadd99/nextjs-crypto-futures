@@ -29,8 +29,9 @@ export async function POST(request) {
     const order = await request.json();
 
     let testOrder = {
-      instId: "USDC-USDT-SWAP",
+      instId: "PIPPIN-USDT-SWAP",
       tdMode: "cross", //保證金模式：isolated：逐倉；cross：全倉非保證金模式：cash
+     // ccy:"PIPPIN",//保證金幣種
       clOrdId: "lucaTestOrder01", //客戶自訂訂單ID
       side: "buy",
       ordType: "market", //訂單類型
@@ -41,7 +42,7 @@ export async function POST(request) {
 
     // ------------下訂單----------------
     const placeOrder = await client.submitOrder(order);
-    // console.log(placeOrder);
+    console.log(order);
 
     return new Response(JSON.stringify({ placeOrder }), {
       status: 200,
