@@ -243,7 +243,7 @@ function PairSubscription({ pair, now }) {
         throw new Error("Network response was not ok");
       }
       const data = await response.json();
-      console.log("from order bInance API:", data);
+      console.log("from order bInance API response:", data);
     } catch (err) {
       console.error("Order Binance API error:", err);
     }
@@ -260,7 +260,7 @@ function PairSubscription({ pair, now }) {
         throw new Error("Network response was not ok");
       }
       const data = await response.json();
-      console.log("from order OKX API:", data);
+      console.log("from order OKX API response:", data);
     } catch (err) {
       console.error("Order OKX API error:", err);
     }
@@ -319,7 +319,7 @@ function PairSubscription({ pair, now }) {
         clOrdId: "lucaTestOrder",
         side: "sell",
         ordType: "market",
-        sz: size /ctValOkx,
+        sz: size /ctValOkx,//not working well
         //posSide:"long",
       };
       console.log(" +A - B 訂單成立");
